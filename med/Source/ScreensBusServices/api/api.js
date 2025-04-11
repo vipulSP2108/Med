@@ -1,0 +1,1 @@
+export const GOOGLE_SCRIPT_getBusSchedule = 'https://script.google.com/macros/s/AKfycbxSJ2L-4u_LqvnKvWS72lJYvzvHIpQStXdYjIoRFNW3IJWte_MlXDlL0IM7hdtMB8UR8A/exec'
