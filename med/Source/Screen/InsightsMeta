@@ -1,0 +1,377 @@
+const BANNER_H = Dimensions.get('window').height * 0.82;
+import React, { useState, useEffect, useRef, useContext } from 'react';
+import { View, Text, TouchableOpacity, Dimensions, ScrollView, Animated, } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import Colors from "../Components/Colors";
+import { GlobalStateContext } from '../Context/GlobalStateContext';
+import { PieChart } from 'react-native-gifted-charts';
+import Titles from '../Components/Titles';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import TextStyles from '../Style/TextStyles';
+import { API_BASE_URL, ORDERHISTORYDATA_ENDPOINT } from '../Constants/Constants';
+import { ThemeContext } from '../Context/ThemeContext';
+
+const data = [
+  {
+    id: "1737808504238",
+    date: "Saturday, January 25th 2025",
+    totalPrice: 80,
+    orders: [
+      { name: "Missal", price: 40, quantity: 1 },
+      { name: "Poha", price: 20, quantity: 2 }
+    ]
+  },
+  {
+    id: "1737808497323",
+    date: "Saturday, January 24th 2025",
+    totalPrice: 60,
+    orders: [
+      { name: "Missal", price: 40, quantity: 1 },
+      { name: "Poha", price: 20, quantity: 1 }
+    ]
+  },
+  {
+    id: "1737808490595",
+    date: "Saturday, January 30th 2024",
+    totalPrice: 40,
+    orders: [
+      { name: "Missal", price: 40, quantity: 1 }
+    ]
+  }
+];
+
+const formatDate = (dateStr) => {
+  const cleanedDateStr = dateStr
+    .replace(/^[A-Za-z]+, /, '') // Remove weekday name
+    .replace(/(\d+)(st|nd|rd|th)/, '$1'); // Remove date suffixes (e.g., "1st" -> "1")
+
+  const parts = cleanedDateStr.split(' ');
+  if (parts.length !== 3) {
+    console.error('Invalid date format:', cleanedDateStr);
+    return null;
+  }
+
+  const monthNames = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December"
+  ];
+
+  const monthIndex = monthNames.indexOf(parts[0]);
+  if (monthIndex === -1) {
+    console.error('Invalid month:', parts[0]);
+    return null;
+  }
+
+  const day = parts[1];
+  const year = parts[2];
+
+  const formattedDate = `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  const date = new Date(formattedDate);
+
+  return date;
+};
+
+const pieDataDemo = [
+  { value: 40, color: '#009FFF', gradientCenterColor: '#006DFF', },
+  { value: 60, color: 'rgba(147, 252, 248, 10)', gradientCenterColor: '#3BE9DE' },
+];
+
+const categoryData = [
+  { 'type': 'Veg', 'color': '#00e676' },
+  { 'type': 'NonVeg', 'color': '#ff0000' },
+  { 'type': 'Stationery', 'color': "#0092ff" },
+  { 'type': 'Beverage', 'color': '#4ABFF4' },
+  { 'type': 'Hot_Cafe', 'color': '#923c01' },
+  { 'type': 'Cold_Cafe', 'color': '#c37960' },
+  { 'type': 'Snacks', 'color': 'orange' },
+  { 'type': 'Hot_Meal', 'color': '#ffb80e' },
+  { 'type': 'Cold_Dessert', 'color': '#FF4191' },
+  { 'type': 'Cold_Beverage', 'color': '#4ABFF4' },
+  { 'type': 'Fresh', 'color': 'green' },
+  { 'type': 'Hot_Snacks', 'color': '#ff611d' },
+  { 'type': 'Bakery_Dessert', 'color': '#FF4191' },
+  { 'type': 'Bakery_Bread', 'color': '#efa14b' },
+];
+
+const Home = () => {
+  const scrollA = useRef(new Animated.Value(0)).current;
+  const { dateGroup } = useContext(GlobalStateContext);
+const { themeColors, toggleTheme } = useContext(ThemeContext);
+  var totalOrders = 0;
+  var totalSpend = 0;
+  var totalQuantity = 0;
+  dateGroup.map((item) => {
+    totalSpend += item.total;
+    totalOrders = item.orders.length;
+    item.orders.map((orders) => {
+      orders.items.map((items) => {
+        totalQuantity += parseInt(items.quantity, 10);
+      })
+    })
+  });
+
+  const [historyOutlet, setHistoryOutlet] = useState([]);
+  const fontstyles = TextStyles();
+  const [metadata, setMetadata] = useState(dayData);
+
+  const getData = async () => {
+    try {
+      const token = await AsyncStorage.getItem("token");
+      console.log(token);
+      const response = await fetch(`${API_BASE_URL}:${ORDERHISTORYDATA_ENDPOINT}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ token: token }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Network response was not ok ' + response.statusText);
+      }
+
+      const data = await response.json();
+
+      // Update state with the correct array
+      setHistoryOutlet(data.data);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    }
+  };
+
+  useEffect(() => {
+    getData();
+  }, []);
+
+  const [dayData, setDayData] = useState({ itemsSold: 0, moneyEarned: 0, ordersCount: 0 });
+  const [monthData, setMonthData] = useState({ itemsSold: 0, moneyEarned: 0, ordersCount: 0 });
+  const [yearData, setYearData] = useState({ itemsSold: 0, moneyEarned: 0, ordersCount: 0 });
+
+  const aggregateData = (data) => {
+    // data.status User Came
+    // data.status Cancelled
+     // data.status All
+    
+    let itemsSoldDay = 0, moneyEarnedDay = 0, ordersCountDay = 0;
+    let itemsSoldMonth = 0, moneyEarnedMonth = 0, ordersCountMonth = 0;
+    let itemsSoldYear = 0, moneyEarnedYear = 0, ordersCountYear = 0;
+
+    const today = new Date();
+    const thirtyDaysAgo = new Date(new Date().setDate(today.getDate() - 30));
+    const oneYearAgo = new Date(today);
+    oneYearAgo.setFullYear(today.getFullYear() - 1);
+
+    data.forEach((entry) => {
+      const orderDate = formatDate(entry.date);
+      if (!orderDate) return;
+
+      // Process for today
+      if (orderDate.toDateString() === today.toDateString()) {
+        entry.orders.forEach((order) => {
+          itemsSoldDay += order.quantity;
+          moneyEarnedDay += order.price * order.quantity;
+        });
+        ordersCountDay += 1;
+      }
+
+      // Process for the current month
+      if (orderDate >= thirtyDaysAgo) {
+        entry.orders.forEach((order) => {
+          itemsSoldMonth += order.quantity;
+          moneyEarnedMonth += order.price * order.quantity;
+        });
+        ordersCountMonth += 1;
+      }
+
+      // Process for the current year
+      if (orderDate >= oneYearAgo) {
+        entry.orders.forEach((order) => {
+          itemsSoldYear += order.quantity;
+          moneyEarnedYear += order.price * order.quantity;
+        });
+        ordersCountYear += 1;
+      }
+    });
+
+    setDayData({ itemsSold: itemsSoldDay, moneyEarned: moneyEarnedDay, ordersCount: ordersCountDay });
+    setMonthData({ itemsSold: itemsSoldMonth, moneyEarned: moneyEarnedMonth, ordersCount: ordersCountMonth });
+    setYearData({ itemsSold: itemsSoldYear, moneyEarned: moneyEarnedYear, ordersCount: ordersCountYear });
+  };
+
+  useEffect(() => {
+    aggregateData(historyOutlet[0]?.orderDetails ? historyOutlet[0].orderDetails : data);
+    setMetadata(dayData);
+  }, [historyOutlet]);
+
+  const [activeButton, setActiveButton] = useState('Todays');
+
+  const handleSelectionPress = (button) => {
+    if (button === 'Todays') {
+      setMetadata(dayData);
+    } else if (button === 'Months') {
+      setMetadata(monthData);
+    } else if (button === 'Years') {
+      setMetadata(yearData);
+    }
+    setActiveButton(button);
+  };
+
+  return (
+    <View className={`bodyContainer w-full flex`} style={{ backgroundColor: themeColors.componentColor }}>
+      {/* <StatusBar backgroundColor='black' /> */}
+      {/* <LinearGradient
+        // Button Linear Gradient
+        colors={["black", "black", themeColors.backGroundColor, themeColors.componentColor, themeColors.secComponentColor]} className='bodyBGContainer absolute w-full rounded-b-lg' style={{ height: Dimensions.get('window').height * 0.5, backgroundColor: themeColors.componentColor }}
+      /> */}
+      <Animated.ScrollView
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollA } } }],
+          { useNativeDriver: true },
+        )}
+        scrollEventThrottle={16}
+        keyboardDismissMode='on-drag'
+      >
+
+        <View style={[styles.verticalScrollContainer, {backgroundColor: themeColors.backGroundColor}]}>
+          {/* style={{ height: Dimensions.get('window').height * 0.1 }} */}
+          <View className='w-full' >
+            <Titles title={"Insight Timer"} width={60} />
+            {/* <Text style={{ color: themeColors.mainTextColor }} className=' text-center p-2 pb-5 font-black text-3xl'>Weeky Performance</Text> */}
+          </View>
+
+          <View className='items-center py-8'>
+            <View style={{ backgroundColor: themeColors.secComponentColor }} className='flex-row rounded-full justify-center'>
+              <TouchableOpacity
+                activeOpacity={1}
+                className='rounded-full'
+                onPress={() => handleSelectionPress('Todays')}
+                style={{ backgroundColor: activeButton === 'Todays' ? themeColors.diffrentColorOrange : 'transparent' }}
+              >
+                <Text
+                  style={{ color: themeColors.mainTextColor }}
+                  className={`font-black text-base px-5 py-2 rounded-full`}
+                >
+                  Today's
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                activeOpacity={1}
+                className='rounded-full'
+                onPress={() => handleSelectionPress('Months')}
+                style={{ backgroundColor: activeButton === 'Months' ? themeColors.diffrentColorOrange : 'transparent' }}
+              >
+                <Text
+                  style={{ color: themeColors.mainTextColor }}
+                  className={`font-black text-base px-5 py-2 rounded-full`}
+                >
+                  Month's
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                activeOpacity={1}
+                className='rounded-full'
+                onPress={() => handleSelectionPress('Years')}
+                style={{ backgroundColor: activeButton === 'Years' ? themeColors.diffrentColorOrange : 'transparent' }}
+              >
+                <Text
+                  style={{ color: themeColors.mainTextColor }}
+                  className={`font-black text-base px-5 py-2 rounded-full`}
+                >
+                  Year's
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {metadata &&
+            <View className='flex-row mx-4 justify-between'>
+              <View className='w-[56%] gap-3'>
+                <View style={{ elevation: 30, backgroundColor: themeColors.componentColor }} className='flex-row rounded-2xl px-3 py-5 items-center justify-center'>
+                  <View className=' items-center mr-2 justify-center h-10 w-10 rounded-full' style={{ backgroundColor: themeColors.diffrentColorPerple }}>
+                    <Ionicons name="cart" size={24} color={themeColors.mainTextColor} />
+                  </View>
+                  <View>
+                    <Text style={{ color: themeColors.mainTextColor }} className='font-black text-2xl'>{metadata.ordersCount}</Text>
+                    <Text style={{ color: themeColors.textColor }} className='font-light text-base'>Orders Placed</Text>
+                  </View>
+                </View>
+                <View style={{ elevation: 30, backgroundColor: themeColors.componentColor }} className='flex-row rounded-2xl px-3 py-5 items-center justify-center'>
+                  <View className=' items-center mr-2 justify-center h-10 w-10 rounded-full' style={{ backgroundColor: themeColors.diffrentColorGreen }}>
+                    <Ionicons name="archive" size={24} color={themeColors.mainTextColor} />
+                  </View>
+                  <View>
+                    <Text style={{ color: themeColors.mainTextColor }} className='font-black text-2xl'>{metadata.itemsSold}</Text>
+                    <Text style={{ color: themeColors.textColor }} className='font-light text-base'>Items Sold</Text>
+                  </View>
+                </View>
+              </View>
+
+              <View style={{ elevation: 30, backgroundColor: themeColors.componentColor }} className='w-[44%] items-center justify-center rounded-2xl'>
+                <View className=' items-center mb-2 justify-center h-10 w-10 rounded-full' style={{ backgroundColor: themeColors.diffrentColorRed }}>
+                  <Ionicons name="wallet" size={24} color={themeColors.mainTextColor} />
+                </View>
+                <Text style={{ color: themeColors.mainTextColor }} className='font-black text-2xl'>{metadata.moneyEarned}</Text>
+                <Text style={{ color: themeColors.textColor }} className='font-light text-base'>Money Earned</Text>
+              </View>
+            </View>
+          }
+
+          <View style={{ elevation: 30, backgroundColor: themeColors.componentColor }} className='mt-4 mx-4 flex-row px-6 py-4 rounded-3xl justify-between'>
+            <View className='items-center justify-center'>
+              <Text style={{ color: themeColors.mainTextColor }} className='font-black text-2xl'>Weeky {'\n'}Performance</Text>
+              <Text style={{ color: themeColors.textColor }} className='font-light text-base mt-2'>Total spend</Text>
+            </View>
+            <PieChart
+              data={pieDataDemo}
+              donut
+              showGradient
+              sectionAutoFocus
+              radius={45}
+              innerRadius={30}
+              innerCircleColor={themeColors.componentColor}
+              centerLabelComponent={() => {
+                return (
+                  <View className=' flex-row justify-between items-end'>
+                    <Text style={{ color: themeColors.mainTextColor }} className='font-black text-2xl'>60</Text>
+                    <Text style={{ color: themeColors.mainTextColor }} className='font-light text-xs'>%</Text>
+                  </View>
+                );
+              }}
+            />
+          </View>
+        </View>
+
+      </Animated.ScrollView>
+
+    </View>
+  );
+};
+
+const styles = {
+  // shadowProp: {
+  //   elevation: 30,
+
+  // },
+  verticalScrollContainer: {
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    flex: 1,
+    // bg color
+  },
+
+  banner: scrollA => ({
+    height: BANNER_H,
+    backGroundColor: 'red',
+    width: '200%',
+    transform: [
+      {
+        translateY: scrollA.interpolate({
+          inputRange: [-BANNER_H, 0, BANNER_H, BANNER_H],
+          outputRange: [-0, 0, BANNER_H * 0.99, -BANNER_H * 0.5], // Adjust to bring back into view
+        }),
+      },
+    ],
+  }),
+};
+
+export default Home
